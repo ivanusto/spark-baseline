@@ -5,7 +5,7 @@ Describe the state of a DGX Spark (or any Ubuntu-based GPU node) as plain text, 
 | File | What it does |
 |---|---|
 | `baseline-snapshot.sh` | Writes 37 text files (identity, driver, packages, holds, accounts, sshd config, network, storage, services, containers) plus `99-summary.txt` to `baseline/<host>/<timestamp>/`. Modifies nothing. Root not required: `33-sshd-effective`, `35-sudoers` and the ufw rules in `45-ufw` need root and are skipped with a note when `sudo -n` would prompt. |
-| `10-hardening.conf` | sshd drop-in: keys only, no root, `AllowGroups sshusers`, no forwarding. |
+| `10-hardening.conf` | sshd drop-in: keys only, no root, `AllowGroups sshusers`, no agent/X11 forwarding, local TCP forwarding only. |
 | `harden-ssh.sh` | Installs the drop-in. Refuses to reload sshd unless `ADMIN_USER` is in `sshusers` and has an authorized key, and unless `sshd -t` and `sshd -T` confirm passwords are off. On a failed check the previous drop-in is restored. |
 
 ```sh
@@ -20,7 +20,9 @@ Topic files hold no timestamps, PIDs, ephemeral ports or usage figures, so a dif
 
 The DGX serial number is masked in `00-identity.txt`, and `32-authorized-keys.txt` keeps only key type and comment. Snapshots still contain account names and LAN addresses, so keep them in a private repository.
 
-`AllowTcpForwarding no` also blocks VS Code Remote-SSH and `ssh -L` tunnels; use a `Match Group` block if someone needs them.
+`AllowTcpForwarding local` keeps `ssh -L` working, which DGX Dashboard needs: it listens on `127.0.0.1:11000` only, so it is reached with `ssh -L 11000:localhost:11000 <node>` and a browser on `http://localhost:11000` (NVIDIA Sync and VS Code Remote-SSH use the same mechanism). Remote forwarding (`ssh -R`) stays off.
+
+Before updating through DGX Dashboard, run `apt-mark unhold` on the pinned packages: Dashboard upgrades through aptdaemon, and a held package is kept back, which can leave a node half updated. Update both nodes in the same window, then diff `10` to `13`, `21` and the `DGX_OTA_VERSION` lines of `00` in the two new snapshots; they must match before the pair goes back into service.
 
 `PIN_RE` at the top of `baseline-snapshot.sh` names the packages worth holding (driver branch 580, kernel and its prebuilt NVIDIA modules, CUDA and NCCL, docker and the NVIDIA container toolkit, RDMA user space, NIC firmware manager). Change `580` if your driver branch differs. Do not hold every `nvidia-*` package on DGX OS: many of them are OS configuration packages (repository keys, OTA checks) and holding them blocks updates.
 
