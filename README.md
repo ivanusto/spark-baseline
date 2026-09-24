@@ -16,6 +16,8 @@ diff -r baseline/spark-a/<t1> baseline/spark-a/<t2>         # drift over time
 cut -f1 baseline/<host>/<t>/21-dpkg-pinned-candidates.txt | xargs sudo apt-mark hold
 ```
 
+`62-docker-info.txt` records `/etc/docker/daemon.json` as well, since settings such as `default-cgroupns-mode` do not appear in `docker info`.
+
 Topic files hold no timestamps, PIDs, ephemeral ports or usage figures, so a diff shows configuration drift rather than the passage of time. Expected differences between two nodes: `00-identity.txt` (hostname, factory image), `40` to `42` (addresses, routes, MACs), `52-fstab.txt` (disk UUIDs), and `32-authorized-keys.txt` if keys differ. Anything else is drift to explain.
 
 The DGX serial number is masked in `00-identity.txt`, and `32-authorized-keys.txt` keeps only key type and comment. Snapshots still contain account names and LAN addresses, so keep them in a private repository.

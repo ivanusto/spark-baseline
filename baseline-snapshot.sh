@@ -138,7 +138,13 @@ run 54-swap.txt sh -c 'swapon --show=NAME,TYPE,SIZE,PRIO; cat /proc/sys/vm/swapp
 run 60-services-enabled.txt sh -c 'systemctl list-unit-files --state=enabled --no-pager --no-legend | grep -v "^snap-.*\.mount "'
 run 61-services-running.txt systemctl list-units --type=service --state=running --no-pager --no-legend --plain
 # shellcheck disable=SC2016 # Go template, not shell
-run 62-docker-info.txt docker info --format 'server={{.ServerVersion}} storage={{.Driver}} cgroup={{.CgroupDriver}} v{{.CgroupVersion}} default_runtime={{.DefaultRuntime}} runtimes={{range $k, $v := .Runtimes}}{{$k}} {{end}}'
+run 62-docker-info.txt docker info --format 'server={{.ServerVersion}} storage={{.Driver}} cgroup={{.CgroupDriver}} v{{.CgroupVersion}} live_restore={{.LiveRestoreEnabled}} default_runtime={{.DefaultRuntime}} runtimes={{range $k, $v := .Runtimes}}{{$k}} {{end}}'
+# daemon.json holds settings docker info does not show (default-cgroupns-mode,
+# for one); an absent file means dockerd defaults, which is itself a state.
+{
+    echo '--- /etc/docker/daemon.json'
+    if [ -f /etc/docker/daemon.json ]; then cat /etc/docker/daemon.json 2>&1; else echo '[absent: dockerd defaults]'; fi
+} >> "$OUT/62-docker-info.txt"
 run 63-docker-images.txt sh -c "docker images --digests --format '{{.Repository}}:{{.Tag}}\t{{.Digest}}' | sort"
 run 64-docker-ps.txt sh -c "docker ps -a --format '{{.Names}}\t{{.Image}}\t{{.State}}' | sort"
 run 65-crontab.txt crontab -l
