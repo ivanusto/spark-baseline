@@ -91,6 +91,12 @@ cat /etc/apt/sources.list /etc/apt/sources.list.d/* > "$OUT/23-apt-sources.txt" 
 # ---------------------------------------------------------------- accounts / access
 awk -F: '$3 >= 1000 && $3 < 65534 {print $1":"$3":"$4":"$7}' /etc/passwd > "$OUT/30-users.txt"
 getent group sudo docker adm sshusers 2>/dev/null > "$OUT/31-privileged-groups.txt"
+# Service accounts (svc-*) are system accounts below uid 1000, so 30 misses
+# them. uid is left out because useradd --system assigns it per node; groups
+# granted by a unit's SupplementaryGroups= show up in 67, not here.
+awk -F: '$1 ~ /^svc-/ {print $1":"$7}' /etc/passwd | while IFS=: read -r U SH; do
+    echo "$U:$SH groups=$(id -nG "$U" 2>/dev/null | tr ' ' ',')"
+done > "$OUT/36-service-accounts.txt"
 awk -F: '$3 >= 1000 && $3 < 65534 {print $1}' /etc/passwd | while IFS= read -r U; do
     H=$(getent passwd "$U" | cut -d: -f6)
     if [ -r "$H/.ssh/authorized_keys" ]; then
@@ -149,6 +155,14 @@ run 63-docker-images.txt sh -c "docker images --digests --format '{{.Repository}
 run 64-docker-ps.txt sh -c "docker ps -a --format '{{.Names}}\t{{.Image}}\t{{.State}}' | sort"
 run 65-crontab.txt crontab -l
 run 66-sysctl.txt sh -c 'sysctl vm.swappiness vm.overcommit_memory kernel.panic net.core.rmem_max net.core.wmem_max 2>/dev/null'
+# Host memory guard (github.com/ivanusto/gb10-ops): its thresholds and the unit
+# as systemd resolves it, drop-ins included. A threshold change shows up here.
+{
+    echo '--- /etc/default/gb10-host-guard'
+    if [ -f /etc/default/gb10-host-guard ]; then cat /etc/default/gb10-host-guard 2>&1; else echo '[absent]'; fi
+    echo '--- systemctl cat gb10-host-guard'
+    systemctl cat gb10-host-guard 2>/dev/null || echo '[absent]'
+} > "$OUT/67-guard-config.txt"
 
 # ---------------------------------------------------------------- summary
 {
